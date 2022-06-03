@@ -12,8 +12,8 @@ package-json.lock
 
 # testing
 /coverage
-output/failed/*
-output/success/*
+/output/failed/*
+/output/success/*
 
 # next.js
 /.next/
