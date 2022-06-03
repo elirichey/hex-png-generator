@@ -1,29 +1,36 @@
-// Test Data...
-
-const hex1 = "#0F00F0";
-const hex2 = "#00BB00";
-const hex3 = "#DD0000";
-const hexWithout = "AA0000";
-const shortHex = "303";
-const brokenBoundry = "G0FA50";
-const brokenLength = "00F0A";
-
-const hexCodes = [
-  hex1,
-  hex2,
-  hex3,
-  hexWithout,
-  shortHex,
-  brokenBoundry,
-  brokenLength,
-];
-
-// Functionality
-
-const fs = require("fs"); // File System
-const path = require("path"); // File Paths
-const nodeHtmlToImage = require("node-html-to-image");
+const fs = require("fs");
+const path = require("path");
+const sharp = require("sharp");
+const csv = require("@fast-csv/parse");
 const regex = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i;
+
+// Parsed CSV Values
+let hexCodes = [];
+
+const parseHexCodesFromCSV = async () => {
+  const contactFileSrc = `./color_options.csv`;
+  const reponse = await new Promise((resolve) => {
+    return fs
+      .createReadStream(path.resolve(contactFileSrc))
+      .pipe(
+        csv.parse({
+          headers: (headers) =>
+            headers.map((header) => {
+              header = header.replace(/[^A-Za-z0-9]/g, "");
+              return header;
+            }),
+        })
+      )
+      .on("error", (error) => console.error(error))
+      .on("data", (row) => hexCodes.push(row))
+      .on("end", (rowCount) => {
+        console.log(`Parsed ${rowCount} rows`);
+        return resolve(hexCodes);
+      });
+  });
+
+  return reponse;
+};
 
 const awaitSuccesses = async () => {
   const successFolder = "./output/success";
@@ -69,54 +76,49 @@ const awaitFailures = async () => {
   return generatedFailures;
 };
 
-const generateImage = (hex) => {
-  nodeHtmlToImage({
-    output: `./output/success/${hex}.png`,
-    html: `
-      <html>
-        <head>
-          <style>
-            body {
-              width: 50px;
-              height: 50px;
-              background-color: #${hex}
-            }
-          </style>
-        </head>
-        <body></body>
-      </html>
-    `,
-  }).then(() => console.log("Image created successfully!", hex));
+const generateImage = async (hex) => {
+  return await sharp({
+    create: {
+      width: 50,
+      height: 50,
+      channels: 4,
+      background: `#${hex}`,
+    },
+  })
+    .png()
+    .toFile(`output/success/${hex}.png`)
+    .then((data) => console.log("Image created successfully!", hex))
+    .catch((err) => console.log("Error", err));
 };
 
 const runScript = async () => {
   try {
+    const parsed = await parseHexCodesFromCSV();
+    // console.log("Done", parsed);
+
     const successes = await awaitSuccesses();
     const failures = await awaitFailures();
+    // console.log("SUCCESSES", successes);
+    // console.log("FAILURES", failures);
 
-    console.log("SUCCESSES", successes);
-    console.log("FAILURES", failures);
-
-    hexCodes.map((item, i) => {
-      const sanitizeHex = item.replace("#", "");
+    hexCodes.map(async (item, i) => {
+      const sanitizeHex = item.Hexc.replace("#", "").toUpperCase();
       const isHexCode = regex.test(sanitizeHex);
 
       if (isHexCode) {
         // Check if it exists...
         const alreadyCreated = successes.some((x) => x === sanitizeHex);
         if (alreadyCreated) return;
-        else generateImage(sanitizeHex);
+        else await generateImage(sanitizeHex);
       } else {
         // This will fail on a per product variation basis
-        // Date should be item id
-        const date = JSON.stringify(new Date().getTime());
         const payload = {
-          itemId: date,
+          itemId: item.Id,
           hexCode: `#${sanitizeHex}`,
         };
         const failedData = JSON.stringify(payload, null, 2);
         fs.writeFileSync(
-          `./output/failed/${date}__${sanitizeHex}.json`,
+          `./output/failed/${item.Id}__${sanitizeHex}.json`,
           failedData
         );
       }
