@@ -4,6 +4,8 @@ false
 *.code-workspace
 
 # dependencies
+yarn.lock
+package-json.lock
 /node_modules
 /.pnp
 .pnp.js
