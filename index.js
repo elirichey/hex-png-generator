@@ -101,14 +101,21 @@ const runScript = async () => {
     // console.log("SUCCESSES", successes);
     // console.log("FAILURES", failures);
 
+    let uniqueHexCodes = [];
+    let hexCodeFailures = [];
     hexCodes.map(async (item, i) => {
       const sanitizeHex = item.Hexc.replace("#", "").toUpperCase();
       const isHexCode = regex.test(sanitizeHex);
 
       if (isHexCode) {
+        const alreadyPresent = uniqueHexCodes.some((x) => x === sanitizeHex);
+        if (alreadyPresent) console.log(`Unique Present: ${sanitizeHex}, ${i}`);
+        else uniqueHexCodes.push(sanitizeHex);
+
         // Check if it exists...
         const alreadyCreated = successes.some((x) => x === sanitizeHex);
-        if (alreadyCreated) return;
+        if (alreadyCreated)
+          return console.log("ALREADY_CREATED", sanitizeHex, "Item #", i);
         else await generateImage(sanitizeHex);
       } else {
         // This will fail on a per product variation basis
@@ -121,8 +128,14 @@ const runScript = async () => {
           `./output/failed/${item.Id}__${sanitizeHex}.json`,
           failedData
         );
+
+        hexCodeFailures.push(sanitizeHex);
       }
     });
+
+    console.log("DONE");
+    console.log("SUCCESS: Unique Hex Codes: ", uniqueHexCodes.length);
+    console.log("FAILURES: Unique Products:", hexCodeFailures.length);
   } catch (e) {
     console.log("ERROR", e);
   }
